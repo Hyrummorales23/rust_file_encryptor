@@ -1,112 +1,77 @@
 // File encryption and decryption tool
+// Encrypts and decrypts files in place (overwrites original file)
 // Uses XOR cipher for educational purposes
-// Demonstrates Rust fundamentals: ownership, structs, vectors, file I/O
 
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self};
 use std::path::Path;
 
 // Struct to hold encryption settings
-// Demonstrates object-oriented techniques with struct and impl
 struct FileEncryptor {
-    key: Vec<u8>,       // Encryption key as bytes
-    mode: String,       // "encrypt" or "decrypt"
-    buffer_size: usize, // Size of buffer for file processing
+    key: Vec<u8>, // Encryption key as bytes
 }
 
 impl FileEncryptor {
     // Constructor - creates new FileEncryptor instance
-    fn new(key: &str, mode: &str) -> Self {
-        // Immutable variable - cannot change after assignment
-        let default_buffer = 4096;
-
-        // Mutable variable - we can modify this
-        let mut buffer_size = default_buffer;
-
-        // Expression - evaluates to a value
-        let mode_string = mode.to_string();
-
+    fn new(key: &str, _mode: &str) -> Self {
+        // Added underscore to tell Rust "I know this param isn't used"
         // Conditional - check if mode is valid
-        if mode != "encrypt" && mode != "decrypt" {
+        if _mode != "encrypt" && _mode != "decrypt" {
             panic!("Mode must be 'encrypt' or 'decrypt'");
         }
 
-        // Conditional expression - assign based on condition
-        buffer_size = if mode == "encrypt" {
-            4096 // Larger buffer for encryption
-        } else {
-            2048 // Smaller buffer for decryption
-        };
-
         FileEncryptor {
             key: key.as_bytes().to_vec(),
-            mode: mode_string,
-            buffer_size,
-        }
-    }
+        } // No comma here, just closing brace
+    } // Closing brace for new()
 
-    // Process file - reads, encrypts/decrypts, writes
-    // Demonstrates function with references (&Path, &mut Vec)
-    fn process_file(&self, input_path: &Path, output_path: &Path) -> io::Result<()> {
-        // Read entire file into memory as Vec<u8>
-        // Demonstrates data structure usage (Vec)
-        let mut data = fs::read(input_path)?;
+    // Encrypt or decrypt a file IN PLACE (overwrites the original)
+    fn process_file_in_place(&self, file_path: &Path) -> io::Result<()> {
+        // Read file into memory
+        let mut data = fs::read(file_path)?;
 
-        // Process the data (encrypt or decrypt)
-        // XOR is reversible: same operation for both
+        // Process the data (XOR encryption/decryption)
         self.xor_cipher(&mut data);
 
-        // Write processed data to output file
-        fs::write(output_path, &data)?;
+        // Write back to SAME file (overwrite)
+        fs::write(file_path, &data)?;
 
+        println!(
+            "  ✓ Processed: {}",
+            file_path.file_name().unwrap().to_string_lossy()
+        );
         Ok(())
     }
 
     // XOR cipher implementation
-    // Takes mutable reference to data Vec
     fn xor_cipher(&self, data: &mut Vec<u8>) {
-        // Loop - iterate through each byte
         for (i, byte) in data.iter_mut().enumerate() {
-            // XOR with key byte (cyclically)
             let key_byte = self.key[i % self.key.len()];
             *byte ^= key_byte;
         }
     }
 
-    // Process directory - encrypt/decrypt all .txt files
+    // Process directory - encrypt/decrypt all .txt files in place
     fn process_directory(&self, dir_path: &Path) -> io::Result<()> {
-        // Read directory entries
         let entries = fs::read_dir(dir_path)?;
 
-        // Loop - iterate over files in directory
+        println!("\nProcessing all .txt files in directory...");
+
         for entry in entries {
             let entry = entry?;
             let path = entry.path();
 
-            // Conditional - check if it's a file and has .txt extension
+            // Only process .txt files
             if path.is_file() {
                 if let Some(ext) = path.extension() {
                     if ext == "txt" {
-                        // Create output filename
-                        let mut output_name = path.file_stem().unwrap().to_os_string();
-                        output_name.push(if self.mode == "encrypt" {
-                            "_encrypted.txt"
-                        } else {
-                            "_decrypted.txt"
-                        });
-
-                        let output_path = path.parent().unwrap().join(output_name);
-
-                        println!(
-                            "Processing: {:?} -> {:?}",
-                            path.file_name().unwrap(),
-                            output_path.file_name().unwrap()
-                        );
-                        self.process_file(&path, &output_path)?;
+                        self.process_file_in_place(&path)?;
                     }
                 }
             }
         }
+
+        println!("\n✓ All files processed successfully!");
         Ok(())
     }
 }
@@ -114,7 +79,11 @@ impl FileEncryptor {
 fn main() -> io::Result<()> {
     println!("========================================");
     println!("   Rust File Encryption/Decryption Tool");
+    println!("         (In-Place Mode)");
     println!("========================================\n");
+
+    println!("⚠️  WARNING: This will OVERWRITE your original files!");
+    println!("   Make backups if needed.\n");
 
     // Get user input
     println!("Enter mode (encrypt/decrypt):");
@@ -134,29 +103,27 @@ fn main() -> io::Result<()> {
 
     let path = Path::new(path_str);
 
+    // Confirmation
+    println!("\n⚠️  This will modify files in place. Continue? (yes/no):");
+    let mut confirm = String::new();
+    io::stdin().read_line(&mut confirm)?;
+    let confirm = confirm.trim();
+
+    if confirm != "yes" && confirm != "y" {
+        println!("Operation cancelled.");
+        return Ok(());
+    }
+
     // Create encryptor instance
     let encryptor = FileEncryptor::new(key, mode);
 
-    // Conditional - check if path is file or directory
+    // Process file or directory
     if path.is_file() {
-        // Process single file
-        let mut output_name = path.file_stem().unwrap().to_os_string();
-        output_name.push(if mode == "encrypt" {
-            "_encrypted.txt"
-        } else {
-            "_decrypted.txt"
-        });
-
-        let output_path = path.parent().unwrap().join(output_name);
-
         println!("\nProcessing single file...");
-        encryptor.process_file(path, &output_path)?;
-        println!("✓ Done! Output: {:?}", output_path.file_name().unwrap());
+        encryptor.process_file_in_place(path)?;
+        println!("\n✓ File processed successfully!");
     } else if path.is_dir() {
-        // Process entire directory
-        println!("\nProcessing all .txt files in directory...");
         encryptor.process_directory(path)?;
-        println!("✓ Done! All files processed.");
     } else {
         println!("✗ Error: Path does not exist!");
     }
@@ -169,13 +136,10 @@ fn main() -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
-    use std::fs;
 
     #[test]
     fn test_encryptor_creation() {
         let encryptor = FileEncryptor::new("test123", "encrypt");
-        assert_eq!(encryptor.mode, "encrypt");
         assert_eq!(encryptor.key, b"test123");
     }
 
@@ -189,7 +153,7 @@ mod tests {
         encryptor.xor_cipher(&mut data);
         assert_ne!(data, original);
 
-        // Decrypt (XOR twice with same key)
+        // Decrypt (XOR twice)
         encryptor.xor_cipher(&mut data);
         assert_eq!(data, original);
     }
