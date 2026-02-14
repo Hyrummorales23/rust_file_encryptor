@@ -12,7 +12,7 @@ A professional-grade file encryption and decryption tool built with Rust. This a
 
 ## Demo Video
 
-[Watch the demo](https://youtu.be/YOUR_VIDEO_ID_HERE)
+[Watch the demo](https://youtu.be/iWvN0LG_nco)
 
 ## Technologies Used
 
